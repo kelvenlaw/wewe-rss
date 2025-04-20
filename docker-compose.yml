@@ -1,47 +1,70 @@
-version: '3.9'
+version: '3.8'
 
 services:
   db:
-    image: mysql:8.3.0
-    command: --mysql-native-password=ON
+    image: mysql:latest
+    container_name: wewe-rss-db
+    restart: always
     environment:
-      # 请修改为自己的密码
-      MYSQL_ROOT_PASSWORD: 123456
-      TZ: 'Asia/Shanghai'
-      MYSQL_DATABASE: 'wewe-rss'
-    # ports:
-    #   - 13306:3306
+      - MYSQL_ROOT_PASSWORD=wewe-rss
+      - MYSQL_DATABASE=wewe_rss
+      - MYSQL_USER=wewe-rss
+      - MYSQL_PASSWORD=wewe-rss
+    ports:
+      - '3306:3306'
     volumes:
       - db_data:/var/lib/mysql
-    healthcheck:
-      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
-      timeout: 45s
-      interval: 10s
-      retries: 10
+    networks:
+      - wewe-rss-network
 
-  app:
-    image: cooderl/wewe-rss:latest
-    ports:
-      - 4000:4000
-    depends_on:
-      db:
-        condition: service_healthy
+  api:
+    build:
+      context: ./
+      dockerfile: ./Dockerfile
+    container_name: wewe-rss-api
+    restart: always
     environment:
-      # 数据库连接地址
-      - DATABASE_URL=mysql://root:123456@db:3306/wewe-rss?schema=public&connect_timeout=30&pool_timeout=30&socket_timeout=30
-      # 服务接口请求授权码
-      - AUTH_CODE=123567
-      # 提取全文内容模式
-      # - FEED_MODE=fulltext
-      # 定时更新订阅源Cron表达式
-      # - CRON_EXPRESSION=35 5,17 * * *
-      # 服务接口请求限制，每分钟请求次数
-      # - MAX_REQUEST_PER_MINUTE=60
-      # 外网访问时，需设置为服务器的公网 IP 或者域名地址
-      # - SERVER_ORIGIN_URL=http://localhost:4000
+      - PORT=4000
+      - DATABASE_URL=mysql://wewe-rss:wewe-rss@db:3306/wewe_rss
+      - DATABASE_TYPE=mysql
+      - AUTH_CODE=YOUR_AUTH_CODE
+      - PLATFORM_URL=http://authserver:8080
+      - SERVER_ORIGIN_URL=http://localhost:4000
+      - CRON_EXPRESSION=0 */20 * * * *
+    ports:
+      - '4000:4000'
+    depends_on:
+      - db
+      - authserver
+    networks:
+      - wewe-rss-network
 
-networks:
-  wewe-rss:
+  authserver:
+    build:
+      context: ./authserver
+      dockerfile: ./Dockerfile
+    image: wewe-rss/authserver
+    container_name: wewe-rss-authserver
+    restart: always
+    environment:
+      - PORT=8080
+      - HOST=0.0.0.0
+      - DEBUG=false
+      - DEFAULT_ARTICLES=20
+    ports:
+      - '8080:8080'
+    networks:
+      - wewe-rss-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
 volumes:
   db_data:
+
+networks:
+  wewe-rss-network:
+    name: wewe-rss-network

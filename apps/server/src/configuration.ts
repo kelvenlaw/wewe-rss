@@ -8,7 +8,7 @@ const configuration = () => {
   );
 
   const authCode = process.env.AUTH_CODE;
-  const platformUrl = process.env.PLATFORM_URL || 'https://weread.111965.xyz';
+  const platformUrl = process.env.PLATFORM_URL || 'https://wewerss.111965.xyz';
   const originUrl = process.env.SERVER_ORIGIN_URL || '';
 
   const feedMode = process.env.FEED_MODE as 'fulltext' | '';
